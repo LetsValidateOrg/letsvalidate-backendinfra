@@ -1,0 +1,42 @@
+service: letsvalidate-api-aws-us-east-2
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: python3.10
+  region: us-east-2
+
+  # Not random, came up with based on good data
+  memorySize: 256
+  iam:
+    role:
+      statements:
+        
+        # Need to be able to read and write to Param Store -- store per-user Flickr OAuth token in Param Store
+        - Effect: "Allow"
+          Action:
+            - "ssm:GetParameter"
+            - "ssm:GetParameters"
+            - "ssm:PutParameter"
+          Resource: "arn:aws:ssm:us-east-2:959720795291:parameter/letsvalidate/*"
+
+
+  httpApi:
+    cors:
+      allowedOrigins:
+        - "https://*"
+
+functions:
+  oauth-callback:
+    handler: cognito-oauth-callback.cognito_oauth_callback_webui_dev
+    events:
+      - httpApi:
+          path: /oauth/callback
+          method: get
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: true

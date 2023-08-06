@@ -1,0 +1,5 @@
+#!/usr/bin/bash
+
+SLS="/home/ubuntu/.nvm/versions/node/v18.17.0/bin/sls"
+
+${SLS} deploy function --function $1
