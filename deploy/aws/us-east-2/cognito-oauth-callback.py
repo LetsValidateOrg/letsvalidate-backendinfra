@@ -44,6 +44,9 @@ def cognito_oauth_callback_webui_dev(event, context):
 
         ssm_params = _get_ssm_oauth_parameters( 'webui_dev' )
 
+        #logger.info("SSM params")
+        #logger.info(json.dumps(ssm_params, indent=4, sort_keys=True))
+
         #logger.debug( "Before calling exchange auth code" )
         try: 
             cognito_response = _exchange_auth_code_for_bearer_token( auth_code, ssm_params )

@@ -24,7 +24,14 @@ provider:
   httpApi:
     cors:
       allowedOrigins:
-        - "https://*"
+        - "*"
+    authorizers:
+      letsvJwtAuthorizer:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_YxLIxaw2F
+        audience:
+           - rme10ok7gdr32r7qgoei8tocv
 
 functions:
   oauth-callback:
@@ -33,6 +40,14 @@ functions:
       - httpApi:
           path: /oauth/callback
           method: get
+  api-add-url:
+    handler: api-add-url.letsvalidate_api_add_url
+    events:
+      - httpApi:
+          path: /api/v001/monitored_url
+          method: post
+          authorizer:
+            name: letsvJwtAuthorizer
 
 plugins:
   - serverless-python-requirements
