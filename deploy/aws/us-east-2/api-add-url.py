@@ -34,9 +34,13 @@ def letsvalidate_api_add_url(event, context):
 
     url_to_monitor = event['queryStringParameters']['url']
 
-    logger.info(f"User requested to monitor URL \"{url_to_monitor}\"")
+    user_cognito_id = event['requestContext']['authorizer']['jwt']['claims']['sub']
 
-    body = None
+    logger.info(f"Cognito user w/ ID {user_cognito_id} requested to monitor URL \"{url_to_monitor}\"")
+
+    body = {
+        "requested_url": url_to_monitor,
+    }
     status_code = 200
 
     return _create_lambda_response(status_code, body, headers)
