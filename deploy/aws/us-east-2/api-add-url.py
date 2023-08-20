@@ -78,14 +78,27 @@ def letsvalidate_api_add_url(event, context):
                     # Add all database rows
                     _add_new_cert_with_monitor( db_cursor, url_to_monitor, cert_info, 
                         user_cognito_id )
+
+                    existing_url_info = _get_existing_url_info(db_cursor, url_to_monitor)
+
                 except Exception as e:
                     logger.warn("Unable to pull cert for URL: " + str(e))
 
-                body = {
-                    "status": "no existing data",
-                }
+                if existing_url_info is not None:
+                     body = {
+                        "cert_retrieved": existing_url_info[0].isoformat(),
+                        "not_before": existing_url_info[1].isoformat(),
+                        "not_after": existing_url_info[2].isoformat(),
+                    }
 
-                status_code = 200
+                    error_code = 200
+
+                else:
+                    body = {
+                        "error": "Inserted rows and monitor but got empty pull"
+                    }
+
+                    status_code = 500
 
     return _create_lambda_response(status_code, body, headers)
 
