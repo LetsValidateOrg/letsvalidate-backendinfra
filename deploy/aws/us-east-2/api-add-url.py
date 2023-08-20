@@ -85,13 +85,13 @@ def letsvalidate_api_add_url(event, context):
                     logger.warn("Unable to pull cert for URL: " + str(e))
 
                 if existing_url_info is not None:
-                     body = {
+                    body = {
                         "cert_retrieved": existing_url_info[0].isoformat(),
                         "not_before": existing_url_info[1].isoformat(),
                         "not_after": existing_url_info[2].isoformat(),
                     }
 
-                    error_code = 200
+                    status_code = 200
 
                 else:
                     body = {
