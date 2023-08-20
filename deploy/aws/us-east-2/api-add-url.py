@@ -53,8 +53,8 @@ def letsvalidate_api_add_url(event, context):
                 # Is THIS user already monitoring it?
                 if _user_already_monitoring(db_cursor, user_cognito_id, url_to_monitor):
                     logger.debug("User already monitoring this URL")
-                    status_code = 204
                     body = None
+                    status_code = 204
                 else:
                     logger.debug("User not monitoring this URL")
                     # Add a monitor for this user, return them the data from last pull
