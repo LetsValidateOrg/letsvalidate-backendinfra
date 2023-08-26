@@ -1,0 +1,6 @@
+#!/usr/bin/bash
+
+PSQL="/usr/bin/psql"
+${PSQL} -f letsvalidate.sql
+
+${PSQL} -f test-rows.sql
