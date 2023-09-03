@@ -1,0 +1,8 @@
+#!/usr/bin/bash
+
+CURL="/usr/bin/curl"
+HEADER_FILE="$0_curlheaders.txt"
+HTTP_VERB="DELETE"
+API_ENDPOINT="https://wvyfbi1fnf.execute-api.us-east-2.amazonaws.com/api/v001/monitored_url"
+
+${CURL} -i -X ${HTTP_VERB} -H @${HEADER_FILE} ${API_ENDPOINT}
