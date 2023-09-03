@@ -37,5 +37,4 @@ CREATE TABLE monitored_urls (
     UNIQUE (url_id, cognito_user_id)
 );
 
-CREATE INDEX idx_monitored_urls_url ON monitored_urls (url_id);
-CREATE INDEX idx_monitored_urls_user ON monitored_urls (cognito_user_id);
+CREATE INDEX monitored_urls_idx_user_monitor_id ON monitored_urls (monitor_id_pk, cognito_user_id);

@@ -29,8 +29,32 @@ def _validate_query_string_params(event, headers):
 def _attempt_monitor_delete( user_id, monitor_id_to_delete ):
     with letsvalidate.util.aws_pgsql.get_db_handle() as db_handle:
         with db_handle.cursor() as db_cursor:
-            pass
- 
+            db_cursor.execute("""
+                DELETE FROM monitored_urls
+                WHERE       monitor_id_pk = %s 
+                    AND     cognito_user_id = %s
+                RETURNING   monitor_id_pk;""",
+
+                (monitor_id_to_delete, user_id) )
+
+            delete_results = db_cursor.fetchone()
+
+
+    headers = {
+        "content-type": "application/json",
+    }
+
+    if delete_results is not None: 
+        body = None
+        status_code = 204
+
+        return letsvalidate.util.aws_apigw.create_lambda_response( status_code, body, headers )
+    else:
+        body = { "error": f"could not find monitor_id \"{monitor_id_to_delete}\" or current user does not have permission to remove it" }
+        status_code = 404
+
+        return letsvalidate.util.aws_apigw.create_lambda_response( status_code, body, headers )
+        
 
 def letsvalidate_api_remove_url(event, context):
     logger.debug( "Incoming event" )
@@ -55,9 +79,4 @@ def letsvalidate_api_remove_url(event, context):
     user_id = event['requestContext']['authorizer']['jwt']['claims']['sub']
     logger.info(f"Cognito user \"{user_id}\" requested to delete monitor_id \"{monitor_id_to_delete}\"")
 
-    _attempt_monitor_delete( user_id, monitor_id_to_delete )
-
-    body = None
-    status_code = 501
-
-    return letsvalidate.util.aws_apigw.create_lambda_response( status_code, body, headers )
+    return _attempt_monitor_delete( user_id, monitor_id_to_delete )
