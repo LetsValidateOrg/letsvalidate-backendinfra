@@ -3,6 +3,8 @@
 import logging
 import letsvalidate.util.aws_apigw
 import letsvalidate.util.aws_pgsql
+import letsvalidate.util.user_state
+import letsvalidate.util.aws_sqs
 import boto3
 import json
 import uuid
@@ -26,34 +28,21 @@ def _validate_query_string_params(event, headers):
     return str(monitor_id)
 
 
-def _attempt_monitor_delete( user_id, monitor_id_to_delete ):
-    with letsvalidate.util.aws_pgsql.get_db_handle() as db_handle:
-        with db_handle.cursor() as db_cursor:
-            db_cursor.execute("""
-                DELETE FROM monitored_urls
-                WHERE       monitor_id_pk = %s 
-                    AND     cognito_user_id = %s
-                RETURNING   monitor_id_pk;""",
+def _attempt_monitor_delete( db_cursor, user_id, monitor_id_to_delete ):
+    db_cursor.execute("""
+        DELETE FROM monitored_urls
+        WHERE       monitor_id_pk = %s 
+            AND     cognito_user_id = %s
+        RETURNING   monitor_id_pk;""",
 
-                (monitor_id_to_delete, user_id) )
+        (monitor_id_to_delete, user_id) )
 
-            delete_results = db_cursor.fetchone()
-
-
-    headers = {
-        "content-type": "application/json",
-    }
+    delete_results = db_cursor.fetchone()
 
     if delete_results is not None: 
-        body = None
-        status_code = 204
-
-        return letsvalidate.util.aws_apigw.create_lambda_response( status_code, body, headers )
+        return True
     else:
-        body = { "error": f"could not find monitor_id \"{monitor_id_to_delete}\" or current user does not have permission to remove it" }
-        status_code = 404
-
-        return letsvalidate.util.aws_apigw.create_lambda_response( status_code, body, headers )
+        return False
         
 
 def letsvalidate_api_remove_url(event, context):
@@ -79,4 +68,24 @@ def letsvalidate_api_remove_url(event, context):
     user_id = event['requestContext']['authorizer']['jwt']['claims']['sub']
     logger.info(f"Cognito user \"{user_id}\" requested to delete monitor_id \"{monitor_id_to_delete}\"")
 
-    return _attempt_monitor_delete( user_id, monitor_id_to_delete )
+    with letsvalidate.util.aws_pgsql.get_db_handle() as db_handle:
+        with db_handle.cursor() as db_cursor:
+
+            if _attempt_monitor_delete( db_cursor, user_id, monitor_id_to_delete ):
+        
+                # Retrieve all updated user state
+                user_state = letsvalidate.util.user_state.get_user_monitor_data( db_cursor, user_id )
+
+                # Ship out the new user state to SQS so we don't hang up this API call any longer
+                letsvalidate.util.aws_sqs.queue_json_for_workers_kv(user_id, user_state )
+
+
+                body = None
+                status_code = 204
+
+                return letsvalidate.util.aws_apigw.create_lambda_response( status_code, body, headers )
+            else:
+                body = { "error": f"could not find monitor_id \"{monitor_id_to_delete}\" or current user does not have permission to remove it" }
+                status_code = 404
+
+                return letsvalidate.util.aws_apigw.create_lambda_response( status_code, body, headers )

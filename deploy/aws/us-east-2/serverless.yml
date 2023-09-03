@@ -33,6 +33,12 @@ provider:
         audience:
            - rme10ok7gdr32r7qgoei8tocv
 
+constructs:
+  worker-kv-updates:
+    type: queue
+    worker:
+      handler: letsvalidate.util.aws_sqs.queue_worker
+
 functions:
 
   oauth-callback:
@@ -59,11 +65,18 @@ functions:
           method: delete
           authorizer:
             name: letsvJwtAuthorizer
+    environment:
+      SQS_QUEUE_URL: ${construct:worker-kv-updates.queueUrl}
 
 
 plugins:
+  - serverless-lift
   - serverless-python-requirements
 
 custom:
   pythonRequirements:
     dockerizePip: true
+
+package:
+  patterns:
+    - "!node_modules/**"
