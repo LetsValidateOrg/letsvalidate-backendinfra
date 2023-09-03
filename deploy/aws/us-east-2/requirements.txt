@@ -1,8 +1,14 @@
+aiohttp==3.8.5
+aiosignal==1.3.1
+async-timeout==4.0.3
+attrs==23.1.0
 certifi==2023.7.22
 cffi==1.15.1
 charset-normalizer==3.2.0
 cryptography==41.0.3
+frozenlist==1.4.0
 idna==3.4
+multidict==6.0.4
 PyJWT==2.8.0
 PyOpenSSL==23.2.0
 oauthlib==3.2.2
@@ -13,3 +19,5 @@ psycopg==3.1.10
 psycopg-binary==3.1.10
 pycparser==2.21
 typing_extensions==4.7.1
+workers-kv.py==1.2.2
+yarl==1.9.2

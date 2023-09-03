@@ -24,10 +24,15 @@ CREATE TABLE urls (
 CREATE INDEX idx_urls_url ON urls (url);
 
 CREATE TABLE monitored_urls (
-    monitor_id_pk   UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
-    monitor_added   timestamp with time zone NOT NULL,
-    url_id          UUID        NOT NULL REFERENCES urls(url_id_pk) ON DELETE CASCADE,
-    cognito_user_id UUID        NOT NULL,
+    monitor_id_pk           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+    monitor_added           timestamp with time zone NOT NULL,
+    url_id                  UUID        NOT NULL REFERENCES urls(url_id_pk) ON DELETE CASCADE,
+    cognito_user_id         UUID        NOT NULL,
+
+    -- Optional fields
+    last_alert_sent         timestamp with time zone,
+    next_alert_scheduled    timestamp with time zone,
+    alert_muted             boolean, 
 
     UNIQUE (url_id, cognito_user_id)
 );
