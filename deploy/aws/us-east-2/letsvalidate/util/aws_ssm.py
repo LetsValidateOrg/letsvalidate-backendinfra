@@ -1,7 +1,17 @@
 #!/usr/bin/python3
 
+import boto3
 
-def get_ssm_params( ssm_client, param_list ):
+endpoint_region = "us-east-2"
+
+try:
+    ssm_client
+except NameError:
+    # Turns out we haven't defined it yet, so get our handle
+    ssm_client = boto3.client( 'ssm', region_name=endpoint_region )
+
+
+def get_ssm_params( param_list ):
     returned_parameters = ssm_client.get_parameters( Names=param_list )
 
     ssm_params = {}
