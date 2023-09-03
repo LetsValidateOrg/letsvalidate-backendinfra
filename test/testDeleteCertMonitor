@@ -5,4 +5,9 @@ HEADER_FILE="$0_curlheaders.txt"
 HTTP_VERB="DELETE"
 API_ENDPOINT="https://wvyfbi1fnf.execute-api.us-east-2.amazonaws.com/api/v001/monitored_url"
 
-${CURL} -i -X ${HTTP_VERB} -H @${HEADER_FILE} ${API_ENDPOINT}
+if [ -z $1 ]; then echo "USAGE: $0 <monitor ID GUID>"; exit; fi
+
+MONITOR_ID=$1
+FULL_URL="${API_ENDPOINT}?monitor_id=${MONITOR_ID}"
+
+${CURL} -i -X ${HTTP_VERB} -H @${HEADER_FILE} ${FULL_URL}

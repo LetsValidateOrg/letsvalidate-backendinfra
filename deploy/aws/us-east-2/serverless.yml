@@ -24,7 +24,7 @@ provider:
   httpApi:
     cors:
       allowedOrigins:
-        - "*"
+        - "https://letsvalidate.org"
     authorizers:
       letsvJwtAuthorizer:
         type: jwt
