@@ -34,12 +34,14 @@ provider:
            - rme10ok7gdr32r7qgoei8tocv
 
 functions:
+
   oauth-callback:
     handler: cognito-oauth-callback.cognito_oauth_callback_webui_dev
     events:
       - httpApi:
           path: /oauth/callback
           method: get
+
   api-add-url:
     handler: api-add-url.letsvalidate_api_add_url
     events:
@@ -48,6 +50,16 @@ functions:
           method: post
           authorizer:
             name: letsvJwtAuthorizer
+
+  api-remove-url:
+    handler: api-remove-url.letsvalidate_api_remove_url
+    events:
+      - httpApi:
+          path: /api/v001/monitored_url
+          method: delete
+          authorizer:
+            name: letsvJwtAuthorizer
+
 
 plugins:
   - serverless-python-requirements
