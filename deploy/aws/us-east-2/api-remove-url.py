@@ -32,25 +32,56 @@ def _validate_query_string_params(event, headers):
 
 
 def _attempt_monitor_delete( db_cursor, user_id, monitor_id_to_delete ):
-    # Get info about this monitor
+
+    # Take the monitor ID and work back to URL ID and Cert Issuer ID
+    #       NOTE (SECURITY RISK): make sure to match on both monitor ID AND user, to make sure user
+    #       doesn't try to delete a monitor they didn't create and do not own!!!
     db_cursor.execute("""
-        SELECT      url_id
+        SELECT      cert_issuers.cert_issuer_id_pk  AS cert_issuer_id,
+                    urls.url_id_pk                  AS url_id
         FROM        monitored_urls
-        WHERE       monitor_id_pk = %s
-            AND     cognito_user_id = %s;""",
+        JOIN        urls
+            ON      monitored_urls.url_id = urls.url_id_pk 
+        JOIN        cert_issuers
+            ON      cert_issuers.cert_issuer_id_pk = urls.cert_issuer
+        WHERE       monitored_urls.monitor_id_pk = %s
+            AND     monitored_urls.cognito_user_id = %s;""",
 
         (monitor_id_to_delete, user_id) )
 
-    url_id_row = db_cursor.fetchone()
+    full_details_row = db_cursor.fetchone()
 
-    # If we didn't find it, fail out
-    if url_id_row is None:
-        logger.info(f"User \"{user_id}\" tried to delete monitor id \"{monitor_id_to_delete}\", but it doesn't exist" )
+    if full_details_row is None:
         return False
 
-    url_id = str(url_id_row[0])
+    issuer_id   = str(full_details_row[0])
+    url_id      = str(full_details_row[1])
 
-    # Now find out how many people watch that URL
+    # Find out how many certs use the issuer for this URL. If it's only 1, we can delete the issuer and it'll chain through and
+    #   clean up URL *and* monitor
+    db_cursor.execute("""
+        SELECT      COUNT(url_id_pk)
+        FROM        urls
+        WHERE       cert_issuer = %s;""",
+
+        (issuer_id,) )
+
+    cert_issuer_count_row = db_cursor.fetchone()
+    count_urls_with_this_issuer = cert_issuer_count_row[0]
+
+    if count_urls_with_this_issuer == 1:
+        logger.info(f"Can delete cert issuer and chain down through URL to monitor for monitor_id \"{monitor_id_to_delete}\"")
+
+        db_cursor.execute("""
+            DELETE FROM     cert_issuers
+            WHERE           cert_issuer_id_pk = %s;""",
+
+            (issuer_id,) )
+
+        return True
+
+    # If we get here, we can't delete the issuer as multiple URLs share an issuer, but we MAY be the only monitor for this
+    #   URL. See if we can delete the entire URL, which chains through monitor
     db_cursor.execute("""
         SELECT      COUNT(monitor_id_pk)
         FROM        monitored_urls
@@ -63,23 +94,25 @@ def _attempt_monitor_delete( db_cursor, user_id, monitor_id_to_delete ):
 
     # If it's only one, delete the URL which will cascade to the single monitor as well
     if url_monitor_count == 1:
-        logger.info(f"User \"{user_id}\" was the only user monitoring URL ID \"{url_id}\", deleting the entire URL" )
+
+        logger.info(f"User \"{user_id}\" was the only user monitoring URL ID \"{url_id}\", but other certs have same issuer, deleting the entire URL" )
 
         db_cursor.execute("""
             DELETE FROM     urls
             WHERE           url_id_pk = %s;""",
 
-            (url_id,) )
+        (url_id,) )
 
-    # else delete the monitor only
-    else:
-        logger.info(f"Deleting \"{user_id}\" monitor on URL ID \"{url_id}\", leaving URL as others are watching it")
-        db_cursor.execute("""
-            DELETE FROM monitored_urls
-            WHERE       monitor_id_pk = %s 
-                AND     cognito_user_id = %s;""",
+        return True
 
-            (monitor_id_to_delete, user_id) )
+    # Just do the easy thing of deleting our monitor
+    logger.info(f"Deleting \"{user_id}\" monitor on URL ID \"{url_id}\", leaving URL as others are watching it")
+    db_cursor.execute("""
+        DELETE FROM monitored_urls
+        WHERE       monitor_id_pk = %s 
+            AND     cognito_user_id = %s;""",
+
+        (monitor_id_to_delete, user_id) )
 
     return True
         

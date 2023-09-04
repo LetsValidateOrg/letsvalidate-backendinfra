@@ -21,7 +21,8 @@ CREATE TABLE urls (
 
 );
 
-CREATE INDEX idx_urls_url ON urls (url);
+CREATE INDEX urls_idx_url               ON urls (url);
+CREATE INDEX urls_idx_cert_issuer       ON urls (cert_issuer);
 
 CREATE TABLE monitored_urls (
     monitor_id_pk           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
