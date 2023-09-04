@@ -7,6 +7,7 @@ import botocore.exceptions
 import ssl
 import OpenSSL
 import datetime
+import urllib.parse
 
 import letsvalidate.util.aws_apigw
 import letsvalidate.util.aws_pgsql
@@ -76,6 +77,10 @@ def letsvalidate_api_add_url(event, context):
                 except Exception as e:
                     logger.warn("Unable to pull cert for URL: " + str(e))
 
+                    status_code = 400
+                    body = { "error": "Could not retrieve TLS certificate from URL \"" + url_to_monitor + "\"" }
+                    return letsvalidate.util.aws_apigw.create_lambda_response(status_code, body, headers)
+
             # Retrieve all updated user state
             user_state = letsvalidate.util.user_state.get_user_monitor_data( db_cursor, user_cognito_id )
 
@@ -138,7 +143,17 @@ def _get_cognito_user_id(event):
 
 
 def _do_tls_handshake(url):
-    server_cert = ssl.get_server_certificate( ('letsvalidate.org', 443) )
+    # Get the hostname and port out of a URL
+    parsed_uri = urllib.parse.urlparse(url)
+
+    port_to_monitor = parsed_uri.port
+    if port_to_monitor is None:
+        port_to_monitor = 443
+    host_dns_port = ( parsed_uri.hostname, port_to_monitor )
+
+    logger.info( "Going to get TLS cert for " + json.dumps(host_dns_port) )
+
+    server_cert = ssl.get_server_certificate( host_dns_port )
 
     # Decode the cert
     parsed_cert = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM,
