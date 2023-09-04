@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 
 import logging
-import datetime
 import json
 
 import workers_kv 
@@ -36,9 +35,7 @@ def _get_workers_kv_namespace():
         api_key         = workers_kv_params['cf_api_key'] )
 
 
-def write_user_state(user_cognito_id, monitored_cert_data):
-    data_timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(sep=' ', timespec='seconds' )
-
+def write_user_state(user_cognito_id, monitored_cert_data, data_timestamp ):
     # Push this out to worker KV
     workers_kv_key = f"user_state_{user_cognito_id}"
 

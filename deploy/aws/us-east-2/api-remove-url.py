@@ -1,13 +1,16 @@
 #!/usr/bin/python3
 
 import logging
+import datetime
+import json
+import uuid
+
+import boto3
+
 import letsvalidate.util.aws_apigw
 import letsvalidate.util.aws_pgsql
 import letsvalidate.util.user_state
 import letsvalidate.util.aws_sqs
-import boto3
-import json
-import uuid
 
 
 logger = logging.getLogger( "letsvalidate" )
@@ -76,12 +79,14 @@ def letsvalidate_api_remove_url(event, context):
                 # Retrieve all updated user state
                 user_state = letsvalidate.util.user_state.get_user_monitor_data( db_cursor, user_id )
 
+                # Data timestamp
+                data_timestamp = datetime.datetime.now(datetime.timezone.utc).isoformat(sep=' ', timespec='seconds' )
+
                 # Ship out the new user state to SQS so we don't hang up this API call any longer
-                letsvalidate.util.aws_sqs.queue_json_for_workers_kv(user_id, user_state )
+                letsvalidate.util.aws_sqs.queue_json_for_workers_kv(user_id, user_state, data_timestamp )
 
-
-                body = None
-                status_code = 204
+                body = letsvalidate.util.aws_apigw.create_authoritative_user_state( user_state, data_timestamp )
+                status_code = 200
 
                 return letsvalidate.util.aws_apigw.create_lambda_response( status_code, body, headers )
             else:

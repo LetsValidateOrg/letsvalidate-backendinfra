@@ -26,11 +26,12 @@ except NameError:
     sqs_queue_url = os.getenv('SQS_QUEUE_URL')
 
 
-def queue_json_for_workers_kv(user_id, user_state):
+def queue_json_for_workers_kv(user_id, user_state, data_timestamp ):
     try: 
         message_body = {
-            'user_id'       : user_id,
-            'user_state'    : user_state,
+            'user_id'           : user_id,
+            'user_state'        : user_state,
+            'data_timestamp'    : data_timestamp,
         }
 
         sqs_client.send_message(
@@ -54,6 +55,7 @@ def queue_worker(event, context):
         kv_update_data = json.loads(record['body'])
         logger.info( json.dumps(kv_update_data, indent=4, sort_keys=True) )
 
-        letsvalidate.util.cf_workers_kv.write_user_state( kv_update_data['user_id'], kv_update_data['user_state'] )
+        letsvalidate.util.cf_workers_kv.write_user_state( kv_update_data['user_id'], kv_update_data['user_state'],
+            kv_update_data['data_timestamp'] )
 
 
