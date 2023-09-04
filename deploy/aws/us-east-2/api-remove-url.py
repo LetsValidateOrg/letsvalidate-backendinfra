@@ -32,20 +32,56 @@ def _validate_query_string_params(event, headers):
 
 
 def _attempt_monitor_delete( db_cursor, user_id, monitor_id_to_delete ):
+    # Get info about this monitor
     db_cursor.execute("""
-        DELETE FROM monitored_urls
-        WHERE       monitor_id_pk = %s 
-            AND     cognito_user_id = %s
-        RETURNING   monitor_id_pk;""",
+        SELECT      url_id
+        FROM        monitored_urls
+        WHERE       monitor_id_pk = %s
+            AND     cognito_user_id = %s;""",
 
         (monitor_id_to_delete, user_id) )
 
-    delete_results = db_cursor.fetchone()
+    url_id_row = db_cursor.fetchone()
 
-    if delete_results is not None: 
-        return True
-    else:
+    # If we didn't find it, fail out
+    if url_id_row is None:
+        logger.info(f"User \"{user_id}\" tried to delete monitor id \"{monitor_id_to_delete}\", but it doesn't exist" )
         return False
+
+    url_id = str(url_id_row[0])
+
+    # Now find out how many people watch that URL
+    db_cursor.execute("""
+        SELECT      COUNT(monitor_id_pk)
+        FROM        monitored_urls
+        WHERE       url_id = %s;""",
+
+        (url_id,) )
+
+    url_monitor_count_row = db_cursor.fetchone()
+    url_monitor_count = url_monitor_count_row[0]
+
+    # If it's only one, delete the URL which will cascade to the single monitor as well
+    if url_monitor_count == 1:
+        logger.info(f"User \"{user_id}\" was the only user monitoring URL ID \"{url_id}\", deleting the entire URL" )
+
+        db_cursor.execute("""
+            DELETE FROM     urls
+            WHERE           url_id_pk = %s;""",
+
+            (url_id,) )
+
+    # else delete the monitor only
+    else:
+        logger.info(f"Deleting \"{user_id}\" monitor on URL ID \"{url_id}\", leaving URL as others are watching it")
+        db_cursor.execute("""
+            DELETE FROM monitored_urls
+            WHERE       monitor_id_pk = %s 
+                AND     cognito_user_id = %s;""",
+
+            (monitor_id_to_delete, user_id) )
+
+    return True
         
 
 def letsvalidate_api_remove_url(event, context):
