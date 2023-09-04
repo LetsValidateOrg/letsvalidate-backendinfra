@@ -4,6 +4,8 @@ import os
 import boto3
 import json
 import logging
+import letsvalidate.util.cf_workers_kv
+
 
 # Example: https://github.com/serverless/examples/tree/v3/aws-python-sqs-worker
 
@@ -36,7 +38,7 @@ def queue_json_for_workers_kv(user_id, user_state):
             MessageBody     = json.dumps(message_body, indent=4, sort_keys=True),
         )
 
-        logger.info("Successfully sent SQS update with new user state for Worker KV on user \"{user_id}\"" )
+        logger.info(f"Successfully sent SQS update with new user state for Worker KV on user \"{user_id}\"" )
 
         return True
     except Exception as e:
@@ -48,4 +50,10 @@ def queue_json_for_workers_kv(user_id, user_state):
 def queue_worker(event, context):
     for record in event['Records']:
         logger.info("SQS message received with Worker KV update data:") 
-        logger.info( json.dumps(record['body'], indent=4, sort_keys=True) )
+
+        kv_update_data = json.loads(record['body'])
+        logger.info( json.dumps(kv_update_data, indent=4, sort_keys=True) )
+
+        letsvalidate.util.cf_workers_kv.write_user_state( kv_update_data['user_id'], kv_update_data['user_state'] )
+
+
