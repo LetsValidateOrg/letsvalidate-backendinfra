@@ -4,25 +4,33 @@ DROP TABLE urls;
 
 CREATE TABLE cert_issuers (
     cert_issuer_id_pk       UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-    cert_issuer             varchar         NOT NULL UNIQUE );
 
-CREATE INDEX idx_cert_issuers_issuer ON cert_issuers(cert_issuer);
+    common_name             varchar         NOT NULL,
+    country                 varchar,
+    organization            varchar,
+    organizational_unit     varchar,
+
+    UNIQUE (common_name, country, organization, organizational_unit)
+);
+
+CREATE INDEX cert_issuers_idx_common_name ON cert_issuers(common_name);
 
 
 CREATE TABLE urls (
-    url_id_pk               UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
-    url                     VARCHAR         NOT NULL UNIQUE,
-    cert_retrieved          timestamp with time zone,
-    cipher_suite            integer,
-    cert_issuer             UUID            REFERENCES cert_issuers(cert_issuer_id_pk) ON DELETE CASCADE,
-    cert_subject            varchar,
-    cert_not_valid_before   timestamp with time zone,
-    cert_not_valid_after    timestamp with time zone
+    url_id_pk                   UUID            PRIMARY KEY DEFAULT gen_random_uuid(),
+    url                         VARCHAR                     NOT NULL UNIQUE,
+    cert_retrieved              timestamp with time zone,
+    cipher_suite                integer,
+    cert_issuer                 UUID            REFERENCES cert_issuers(cert_issuer_id_pk) ON DELETE CASCADE NOT NULL,
+    cert_subject_common_name    varchar                     NOT NULL UNIQUE,
+    cert_not_valid_before       timestamp with time zone,
+    cert_not_valid_after        timestamp with time zone
 
 );
 
 CREATE INDEX urls_idx_url               ON urls (url);
 CREATE INDEX urls_idx_cert_issuer       ON urls (cert_issuer);
+CREATE INDEX urls_idx_cert_retrieved    ON urls (cert_retrieved);
 
 CREATE TABLE monitored_urls (
     monitor_id_pk           UUID        PRIMARY KEY DEFAULT gen_random_uuid(),

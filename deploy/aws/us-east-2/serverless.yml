@@ -6,8 +6,10 @@ provider:
   runtime: python3.10
   region: us-east-2
 
-  # Not random, came up with based on good data
-  memorySize: 256
+  # Not random, came up with based on good data based on timing API calls and seeing where more memory stopped making
+  #     things faster
+  #     https://docs.google.com/spreadsheets/d/1hOHOkk0FCqsmJAsbY-TeU08BNgfBc_G3dwv2Hl2Wzto/edit#gid=0
+  memorySize: 768
   iam:
     role:
       statements:
