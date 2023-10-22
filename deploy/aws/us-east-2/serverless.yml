@@ -27,6 +27,10 @@ provider:
     cors:
       allowedOrigins:
         - "https://letsvalidate.org"
+        - "https://staging.letsvalidate-ui.pages.dev"
+        - "https://dev-cody.letsvalidate-ui.pages.dev"
+        - "https://dev-eric.letsvalidate-ui.pages.dev"
+        - "https://dev-terry.letsvalidate-ui.pages.dev"
     authorizers:
       letsvJwtAuthorizer:
         type: jwt
@@ -47,7 +51,7 @@ functions:
     handler: cognito-oauth-callback.cognito_oauth_callback_webui_dev
     events:
       - httpApi:
-          path: /oauth/callback
+          path: /oauth/callback/{environment}
           method: get
 
   api-add-url:

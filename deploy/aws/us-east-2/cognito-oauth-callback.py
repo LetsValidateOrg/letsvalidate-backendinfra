@@ -10,7 +10,7 @@ import jwt
 from requests.auth      import HTTPBasicAuth
 from requests_oauthlib  import OAuth2Session
 
-logger = logging.getLogger()
+logger = logging.getLogger("letsvalidate")
 logger.setLevel( logging.INFO )
 
 endpoint_region = 'us-east-2'
@@ -36,18 +36,26 @@ def cognito_oauth_callback_webui_dev(event, context):
         body = {
             "error": "URL to OAuth callback did not include \"code\" URL query parameter"
         }
+    elif 'pathParameters' not in event or 'environment' not in event['pathParameters']:
+        status_code = 400
+
+        body = {
+            "error": "URL did not include environment path variable"
+        }
 
     else:
         auth_code = event['queryStringParameters']['code']
 
-        logger.info( f"Valid login attempt started with auth code {auth_code}")
+        app_client = event['pathParameters']['environment']
 
-        ssm_params = _get_ssm_oauth_parameters( 'webui_dev' )
+        logger.info( f"Valid login attempt started for app_client={app_client}, auth code={auth_code}")
 
-        #logger.info("SSM params")
-        #logger.info(json.dumps(ssm_params, indent=4, sort_keys=True))
+        ssm_params = _get_ssm_oauth_parameters( app_client )
 
-        #logger.debug( "Before calling exchange auth code" )
+        logger.debug("SSM params")
+        logger.debug(json.dumps(ssm_params, indent=4, sort_keys=True))
+
+        logger.debug( "Before calling exchange auth code" )
         try: 
             cognito_response = _exchange_auth_code_for_bearer_token( auth_code, ssm_params )
         except:
@@ -98,10 +106,13 @@ def cognito_oauth_callback_webui_dev(event, context):
         logger.info( f"Login is valid until {session_state['cognito_session_data']['token_expiration']}" )
 
         # 302 HTTP redirect the user back to their dashboard with all the state data they need encoded in URL
-        headers['location'] = "https://letsvalidate.org/dashboard?access_token=" + \
+        redirect_location = f"{ssm_params['dashboard_url']}?access_token=" + \
                 requests.utils.quote( cognito_response['access_token'] ) + "&refresh_token=" + \
                 requests.utils.quote( cognito_response['refresh_token'] ) + "&access_token_expiration=" + \
                 requests.utils.quote( session_state['cognito_session_data']['token_expiration'] )
+
+        logger.debug(f"Redirecting to {redirect_location}")
+        headers['location'] = redirect_location 
 
         status_code = 302
 
@@ -141,6 +152,7 @@ def _get_ssm_oauth_parameters( app_client_id ):
         "/letsvalidate/auth/app_client/{0}/callback_url".format( app_client_id ),
         "/letsvalidate/auth/app_client/{0}/client_id".format( app_client_id ),
         "/letsvalidate/auth/app_client/{0}/client_secret".format( app_client_id ),
+        "/letsvalidate/auth/app_client/{0}/dashboard_url".format( app_client_id ),
         "/letsvalidate/auth/app_client/{0}/token_url".format( app_client_id ),
     )
 
