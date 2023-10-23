@@ -2,13 +2,16 @@
 
 def get_user_monitor_data(db_cursor, user_id):
     db_cursor.execute("""
-        SELECT      monitored_urls.monitor_id_pk, urls.url, urls.cert_retrieved, urls.cert_not_valid_after, monitored_urls.last_alert_sent,
+        SELECT      monitored_urls.monitor_id_pk, urls.url, tls_certificates.cert_retrieved, 
+                    tls_certificates.cert_not_valid_after, monitored_urls.last_alert_sent,
                     monitored_urls.next_alert_scheduled, monitored_urls.alert_muted
         FROM        urls
         JOIN        monitored_urls
         ON          urls.url_id_pk = monitored_urls.url_id
             AND     monitored_urls.cognito_user_id = %s
-        ORDER BY    urls.cert_not_valid_after;""",
+        JOIN        tls_certificates
+        ON          urls.tls_certificate = tls_certificates.cert_id_pk
+        ORDER BY    tls_certificates.cert_not_valid_after;""",
 
         (user_id,) )
 

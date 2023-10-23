@@ -48,10 +48,10 @@ def letsvalidate_api_add_url(event, context):
     with letsvalidate.util.aws_pgsql.get_db_handle() as db_handle:
         with db_handle.cursor() as db_cursor:
 
-            existing_url_info = _get_existing_url_info(db_cursor, url_to_monitor)
+            existing_cert_info = _get_existing_cert_info_by_url(db_cursor, url_to_monitor)
 
-            if existing_url_info is not None:
-                logger.info("Found existing info about this URL")
+            if existing_cert_info is not None:
+                logger.info("Found existing info about this certificate")
                 # Is THIS user already monitoring it?
                 if _user_already_monitoring(db_cursor, user_cognito_id, url_to_monitor):
                     logger.debug("User already monitoring this URL")
@@ -60,11 +60,12 @@ def letsvalidate_api_add_url(event, context):
                     return letsvalidate.util.aws_apigw.create_lambda_response(status_code, body, headers)
 
                 logger.debug("User not monitoring this URL")
-                # Add a monitor for this user, return them the data from last pull
+
+                # Add a monitor for this user
                 _add_monitor_for_user(db_cursor, user_cognito_id, url_to_monitor)
 
             else:
-                logger.info("Found no existing data about this URL")
+                logger.info("Found no existing data about this certificate")
 
                 # Pull its tls cert
                 try:
@@ -129,7 +130,7 @@ def _add_monitor_for_user(db_cursor, user_id, url):
         (url, user_id) )
 
 
-def _get_existing_url_info(db_cursor, url_to_monitor):
+def _get_existing_cert_info_by_url(db_cursor, url_to_monitor):
     db_cursor.execute("""
         SELECT      cert_retrieved, cert_not_valid_before, cert_not_valid_after
         FROM        tls_certificates
@@ -243,7 +244,7 @@ def _parse_x509_date(date_string):
 
 
 def _add_new_cert_with_monitor(db_cursor, url, cert_info, user_cognito_id ):
-    logging.debug(f"Checking if we have an entry for this cert issuer: {cert_info['issuer_info']['commonName']}")
+    logger.debug(f"Checking if we have an entry for this cert issuer: {cert_info['issuer_info']['commonName']}")
     # Let's see if this cert issuer is known
     db_cursor.execute("""
         SELECT cert_issuer_id_pk 
@@ -255,13 +256,13 @@ def _add_new_cert_with_monitor(db_cursor, url, cert_info, user_cognito_id ):
     cert_issuer_row = db_cursor.fetchone()
 
     if cert_issuer_row is not None:
-        logging.debug(f"Found issuing cert with common name {{cert_info['issuer_info']['commonName']}}, returning the ID for the entry in the DB")
+        logger.debug(f"Found issuing cert with common name {{cert_info['issuer_info']['commonName']}}, returning the ID for the entry in the DB")
         cert_issuer_id = cert_issuer_row[0]
     else:
-        logging.debug(f"No existing cert matching common name {cert_info['issuer_info']['commonName']}, adding new row")
+        logger.debug(f"No existing cert matching common name {cert_info['issuer_info']['commonName']}, adding new row")
         cert_issuer_info = cert_info['issuer_info']
-        logging.debug("Issuer info")
-        logging.debug(json.dumps(cert_issuer_info, indent=4, sort_keys=True) )
+        logger.debug("Issuer info:")
+        logger.debug(json.dumps(cert_issuer_info, indent=4, sort_keys=True) )
         db_cursor.execute("""
             INSERT INTO cert_issuers (common_name, country_name, email_address, locality_name,
                 organization_name, organizational_unit_name, state_or_province )
@@ -274,27 +275,41 @@ def _add_new_cert_with_monitor(db_cursor, url, cert_info, user_cognito_id ):
 
         cert_issuer_id = db_cursor.fetchone()[0]
 
-        logging.debug(f"New cert issuer ID: {cert_issuer_id}")
+        logger.debug(f"New cert issuer ID: {cert_issuer_id}")
 
-    cert_subject_info = cert_info['subject_info']
-
-    logging.debug("Cert subject info")
-    logging.debug(json.dumps(cert_subject_info, indent=4, sort_keys=True))
-
+    # Let's see if the certificate is known
     db_cursor.execute("""
-        INSERT INTO urls (url, cert_retrieved, cert_issuer, 
+        SELECT  cert_id_pk 
+        FROM    tls_certificates
+        WHERE   cert_subject_common_name = %s
+            AND cert_version = %s;""",
 
-            cert_subject_common_name, cert_subject_country_name, cert_subject_email_address, 
-            cert_subject_locality_name, cert_subject_organization_name, 
-            cert_subject_organizational_unit_name, cert_subject_state_or_province,
+        (cert_info['subject_info']['commonName'], cert_info['cert_version']) )
 
-            cert_not_valid_before, cert_not_valid_after,
+    cert_info_row = db_cursor.fetchone()
 
-            serial_number, cert_version)
-        VALUES ( %s, NOW(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s )
-        RETURNING url_id_pk;""",
+    if cert_info_row is not None:
+        logger.debug(f"Found cert with common name {cert_info['subject_info']['commonName']} and version {cert_info['cert_version']}")
+        cert_id = cert_info_row[0]
+    else:
+        logger.debug(f"No existing cert found with common name {cert_info['subject_info']['commonName']} and version {cert_info['cert_version']}")
+        cert_subject_info = cert_info['subject_info']
+        logger.debug("Subject info:")
+        logger.debug(json.dumps(cert_subject_info, indent=4, sort_keys=True))
+        db_cursor.execute("""
+            INSERT INTO tls_certificates (cert_retrieved, cert_issuer, 
 
-        (url, cert_issuer_id, 
+                cert_subject_common_name, cert_subject_country_name, cert_subject_email_address, 
+                cert_subject_locality_name, cert_subject_organization_name, 
+                cert_subject_organizational_unit_name, cert_subject_state_or_province,
+
+                cert_not_valid_before, cert_not_valid_after,
+
+                serial_number, cert_version)
+            VALUES (NOW(), %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s )
+            RETURNING cert_id_pk;""",
+
+            (cert_issuer_id, 
 
             cert_subject_info['commonName'], cert_subject_info['countryName'], 
             cert_subject_info['emailAddress'], cert_subject_info['localityName'],
@@ -304,12 +319,22 @@ def _add_new_cert_with_monitor(db_cursor, url, cert_info, user_cognito_id ):
             cert_info['validity_range']['not_before'], cert_info['validity_range']['not_after'],
 
             cert_info['serial_number'], cert_info['cert_version']) 
-    )
+        )
+        cert_id = db_cursor.fetchone()[0]
+
+    # Add the URL info
+    db_cursor.execute("""
+        INSERT INTO urls (url, hostname_or_ip, tcp_port, tls_certificate)
+        VALUES      (%s, %s, %s, %s)
+        RETURNING   url_id_pk;""",
+
+        (url, 'foobar', 443, cert_id) )
+
 
     # Get the ID for that new row
     new_url_id = db_cursor.fetchone()[0]
 
-    logging.debug(f"New URL ID: {new_url_id}")
+    logger.debug(f"New URL ID: {new_url_id}")
 
     db_cursor.execute("""
         INSERT INTO monitored_urls ( monitor_added, url_id, cognito_user_id )
@@ -317,4 +342,4 @@ def _add_new_cert_with_monitor(db_cursor, url, cert_info, user_cognito_id ):
 
         (new_url_id, user_cognito_id) )
 
-    logging.debug("Successfully added entry to monitored_urls")
+    logger.debug("Successfully added entry to monitored_urls")
