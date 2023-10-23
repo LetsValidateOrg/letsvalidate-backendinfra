@@ -37,7 +37,11 @@ provider:
         identitySource: $request.header.Authorization
         issuerUrl: https://cognito-idp.us-east-2.amazonaws.com/us-east-2_YxLIxaw2F
         audience:
-           - rme10ok7gdr32r7qgoei8tocv
+           - 1aq3d5q40ce3lhdijghi2pi1gn
+           - 4qto2qut19rglo6h6aq7qi98ro
+           - 78ich2vt28i9p89jf87mgg3qdq
+           - hgd8grnghg8vtrmbj9u9gaf3l
+           - sjra3i7iq5ptenkg379vsar2
 
 constructs:
   worker-kv-updates:

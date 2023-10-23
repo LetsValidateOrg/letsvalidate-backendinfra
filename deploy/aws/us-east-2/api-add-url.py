@@ -132,7 +132,9 @@ def _add_monitor_for_user(db_cursor, user_id, url):
 def _get_existing_url_info(db_cursor, url_to_monitor):
     db_cursor.execute("""
         SELECT      cert_retrieved, cert_not_valid_before, cert_not_valid_after
-        FROM        urls
+        FROM        tls_certificates
+        JOIN        urls
+        ON          urls.tls_certificate = tls_certificates.cert_id_pk
         WHERE       url = %s;
         """, (url_to_monitor,) )
         
