@@ -323,12 +323,19 @@ def _add_new_cert_with_monitor(db_cursor, url, cert_info, user_cognito_id ):
         cert_id = db_cursor.fetchone()[0]
 
     # Add the URL info
+    # Get the hostname and port out of a URL
+    parsed_uri = urllib.parse.urlparse(url)
+    port_to_monitor = parsed_uri.port
+    if port_to_monitor is None:
+        port_to_monitor = 443
+    hostname = parsed_uri.hostname
+
     db_cursor.execute("""
         INSERT INTO urls (url, hostname_or_ip, tcp_port, tls_certificate)
         VALUES      (%s, %s, %s, %s)
         RETURNING   url_id_pk;""",
 
-        (url, 'foobar', 443, cert_id) )
+        (url, hostname, port_to_monitor, cert_id) )
 
 
     # Get the ID for that new row
