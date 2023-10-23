@@ -33,17 +33,20 @@ def _validate_query_string_params(event, headers):
 
 def _attempt_monitor_delete( db_cursor, user_id, monitor_id_to_delete ):
 
-    # Take the monitor ID and work back to URL ID and Cert Issuer ID
+    # Take the monitor ID and work back to URL ID, cert ID, and Cert Issuer ID
     #       NOTE (SECURITY RISK): make sure to match on both monitor ID AND user, to make sure user
     #       doesn't try to delete a monitor they didn't create and do not own!!!
     db_cursor.execute("""
         SELECT      cert_issuers.cert_issuer_id_pk  AS cert_issuer_id,
+                    tls_certificates.cert_id_pk     AS cert_id,
                     urls.url_id_pk                  AS url_id
         FROM        monitored_urls
         JOIN        urls
             ON      monitored_urls.url_id = urls.url_id_pk 
+        JOIN        tls_certificates
+            ON      urls.tls_certificate = tls_certificates.cert_id_pk
         JOIN        cert_issuers
-            ON      cert_issuers.cert_issuer_id_pk = urls.cert_issuer
+            ON      cert_issuers.cert_issuer_id_pk = tls_certificates.cert_issuer
         WHERE       monitored_urls.monitor_id_pk = %s
             AND     monitored_urls.cognito_user_id = %s;""",
 
@@ -55,13 +58,14 @@ def _attempt_monitor_delete( db_cursor, user_id, monitor_id_to_delete ):
         return False
 
     issuer_id   = str(full_details_row[0])
-    url_id      = str(full_details_row[1])
+    cert_id     = str(full_details_row[1])
+    url_id      = str(full_details_row[2])
 
     # Find out how many certs use the issuer for this URL. If it's only 1, we can delete the issuer and it'll chain through and
     #   clean up URL *and* monitor
     db_cursor.execute("""
-        SELECT      COUNT(url_id_pk)
-        FROM        urls
+        SELECT      COUNT(cert_id_pk)
+        FROM        tls_certificates
         WHERE       cert_issuer = %s;""",
 
         (issuer_id,) )
@@ -70,7 +74,7 @@ def _attempt_monitor_delete( db_cursor, user_id, monitor_id_to_delete ):
     count_urls_with_this_issuer = cert_issuer_count_row[0]
 
     if count_urls_with_this_issuer == 1:
-        logger.info(f"Can delete cert issuer and chain down through URL to monitor for monitor_id \"{monitor_id_to_delete}\"")
+        logger.info(f"Can delete cert issuer and chain down through cert to URL to monitor for monitor_id \"{monitor_id_to_delete}\"")
 
         db_cursor.execute("""
             DELETE FROM     cert_issuers
@@ -80,8 +84,30 @@ def _attempt_monitor_delete( db_cursor, user_id, monitor_id_to_delete ):
 
         return True
 
-    # If we get here, we can't delete the issuer as multiple URLs share an issuer, but we MAY be the only monitor for this
-    #   URL. See if we can delete the entire URL, which chains through monitor
+    # If we get here, we can't delete the issuer as multiple certs share an issuer.
+
+    # See how many URL's share the cert. If we are the only user of the cert, we can delete the cert will which chain to url and monitor
+    db_cursor.execute("""
+        SELECT      COUNT(url_id_pk) 
+        FROM        urls
+        WHERE       tls_certificate = %s;""",
+
+        (cert_id,) )
+
+
+    url_count = db_cursor.fetchone()[0]
+    if url_count == 1:
+        logger.info("Can delete cert which will chain to url and monitor")
+        db_cursor.execute("""
+            DELETE FROM     tls_certificates
+            WHERE           cert_id_pk = %s;""",
+
+            (cert_id,) )
+
+        return True
+
+
+    # We MAY be the only monitor for this URL. See if we can delete the URL, which chains through monitor
     db_cursor.execute("""
         SELECT      COUNT(monitor_id_pk)
         FROM        monitored_urls
@@ -95,7 +121,7 @@ def _attempt_monitor_delete( db_cursor, user_id, monitor_id_to_delete ):
     # If it's only one, delete the URL which will cascade to the single monitor as well
     if url_monitor_count == 1:
 
-        logger.info(f"User \"{user_id}\" was the only user monitoring URL ID \"{url_id}\", but other certs have same issuer, deleting the entire URL" )
+        logger.info(f"User \"{user_id}\" was the only user monitoring URL ID \"{url_id}\", deleting the URL" )
 
         db_cursor.execute("""
             DELETE FROM     urls

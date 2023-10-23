@@ -1,4 +1,4 @@
-DROP TABLE urls CASCADE;
+DROP TABLE urls CASCADE;4qto2qut19rglo6h6aq7qi98ro
 DROP TABLE monitored_urls CASCADE;
 DROP TABLE cert_issuers CASCADE;
 DROP TABLE tls_certificates CASCADE;
