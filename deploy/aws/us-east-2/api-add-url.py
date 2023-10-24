@@ -29,17 +29,27 @@ def letsvalidate_api_add_url(event, context):
     }
 
     body = None
-    
-    if 'queryStringParameters' not in event or 'url' not in event['queryStringParameters']:
+
+    # Make sure that there body is valid request
+    try:
+        parsed_request_body = json.loads(event['body'])
+    except:
+        logger.warn(f"User request body did not contain valid JSON: {event['body']}")
         status_code = 400
-
         body = {
-            "error": "URL to did not include \"url\" URL query parameter"
+            "error": "request body did not contain valid JSON"
         }
-
         return letsvalidate.util.aws_apigw.create_lambda_response( status_code, body, headers )
 
-    url_to_monitor = event['queryStringParameters']['url']
+    if 'url' not in parsed_request_body:
+        logger.warn("User request JSON did not contain URL object")
+        status_code = 400
+        body = {
+            "error": "request body object did not contain url item"
+        }
+        return letsvalidate.util.aws_apigw.create_lambda_response( status_code, body, headers )
+
+    url_to_monitor = parsed_request_body['url']
 
     user_cognito_id = _get_cognito_user_id(event)
 
@@ -76,7 +86,6 @@ def letsvalidate_api_add_url(event, context):
                         user_cognito_id )
         
                 except Exception as e:
-                    raise e
                     logger.warn("Unable to pull cert for URL: " + str(e))
 
                     status_code = 400

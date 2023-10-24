@@ -62,7 +62,7 @@ functions:
     handler: api-add-url.letsvalidate_api_add_url
     events:
       - httpApi:
-          path: /api/v001/monitored_url
+          path: /api/v001/monitor
           method: post
           authorizer:
             name: letsvJwtAuthorizer
@@ -73,7 +73,7 @@ functions:
     handler: api-remove-url.letsvalidate_api_remove_url
     events:
       - httpApi:
-          path: /api/v001/monitored_url
+          path: /api/v001/monitor/{monitor_id}
           method: delete
           authorizer:
             name: letsvJwtAuthorizer
