@@ -17,13 +17,15 @@ logger = logging.getLogger( "letsvalidate" )
 logger.setLevel( logging.DEBUG )
 
 
-def _validate_query_string_params(event, headers):
-    if 'queryStringParameters' not in event or 'monitor_id' not in event['queryStringParameters']:
+def _validate_url_path_param(event, headers):
+
+    # Make sure the path has the value we need
+    if 'pathParameters' not in event or 'monitor_id' not in event['pathParameters']:
         return None
 
     # Make sure it has a proper value
     try:
-        monitor_id = uuid.UUID(event['queryStringParameters']['monitor_id'])
+        monitor_id = uuid.UUID(event['pathParameters']['monitor_id'])
     except ValueError:
         logger.warn(f"Monitor ID value of {event['queryStringParameters']['monitor_id']} was not a valid UUID")
         return None
@@ -151,13 +153,13 @@ def letsvalidate_api_remove_url(event, context):
         "content-type": "application/json",
     }
 
-    monitor_id_to_delete = _validate_query_string_params(event, headers)
+    monitor_id_to_delete = _validate_url_path_param(event, headers)
 
     if monitor_id_to_delete is None:
         status_code = 400
 
         body = {
-            "error": "URL to did not include valid \"monitor_id\" URL query parameter"
+            "error": "URL did not include valid \"monitor_id\" path parameter"
         }
 
         return letsvalidate.util.aws_apigw.create_lambda_response( status_code, body, headers )
